@@ -1,8 +1,9 @@
-import {useState, useEffect, memo, useCallback} from 'react';
+import {useState, useEffect, useRef, memo, useCallback} from 'react';
 import {Navigate, useParams, useNavigate, useSearchParams} from 'react-router-dom';
 import {apiClient, isAmbiguousIdConflict} from '../lib/api';
 import MDEditor from '@uiw/react-md-editor';
 import MermaidMarkdown from './MermaidMarkdown';
+import DocEditor from './DocEditor';
 import {type Document} from '../../types';
 import AmbiguousIdNotice from './AmbiguousIdNotice';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -66,6 +67,9 @@ const addDocPrefix = (id: string): string => {
     return id.startsWith('doc-') ? id : `doc-${id}`;
 };
 
+// Edits in the visual editor are saved this long after the last keystroke.
+const AUTOSAVE_MS = 800;
+
 const getDocumentDirectory = (path?: string): string => {
     if (!path) return '';
     return path.split(/[\\/]+/).slice(0, -1).join('/');
@@ -82,6 +86,7 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { canWrite } = useBrowserAccess();
+    const { theme } = useTheme();
     const isNewDocument = id === "new";
     const [document, setDocument] = useState<Document | null>(null);
     const [content, setContent] = useState<string>('');
@@ -96,6 +101,13 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
     const [error, setError] = useState<Error | null>(null);
     const [saveError, setSaveError] = useState<Error | null>(null);
     const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+    // Visual editor: its content is remounted (editorVersion) only when the file changes elsewhere.
+    const [editorVersion, setEditorVersion] = useState(0);
+    const [autosave, setAutosave] = useState<'saved' | 'saving' | 'failed'>('saved');
+    const latest = useRef(''); // the Markdown in the editor, or last loaded
+    const sent = useRef(''); // the last Markdown saved from here
+    const pending = useRef<{ timer: ReturnType<typeof setTimeout>; docId: string; markdown: string } | null>(null);
+    const loadedIdentity = useRef<string | null>(null);
     // An archived document is read-only: it shows the Archived label and neither Edit nor Archive.
     const routeIdentity = id && !isNewDocument ? documentIdKey(id) : null;
     const currentDocument = document && routeIdentity && documentIdKey(document.id) === routeIdentity ? document : null;
@@ -129,8 +141,10 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
             setContent('');
             setOriginalContent('');
         } else if (id) {
-            setEditRequested(false); // Ensure we start in preview mode for existing documents
-            void loadDocContent(() => active);
+            // Same document again (the list refreshed, often after our own save): reload quietly.
+            const quiet = loadedIdentity.current === routeIdentity;
+            if (!quiet) setEditRequested(false); // Ensure we start in preview mode for existing documents
+            void loadDocContent(() => active, quiet);
         }
         return () => { active = false; };
     }, [id, docs, isNewDocument, canWrite]);
@@ -147,7 +161,26 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
         }
     }, [searchParams, setSearchParams, canWrite]);
 
-    const loadDocContent = useCallback(async (isCurrent: () => boolean) => {
+    const loadDocContent = useCallback(async (isCurrent: () => boolean, quiet = false) => {
+        if (quiet && routeIdentity) {
+            try {
+                const fullDoc = await apiClient.fetchDoc(routeIdentity);
+                if (!isCurrent()) return;
+                setDocument(fullDoc);
+                const raw = fullDoc.rawContent || '';
+                const ours = [latest.current, sent.current].some((m) => m.trimEnd() === raw.trimEnd());
+                if (!ours && !pending.current) {
+                    // Changed elsewhere (another window, an agent, git): show it.
+                    latest.current = raw;
+                    setContent(raw);
+                    setOriginalContent(raw);
+                    setEditorVersion((v) => v + 1);
+                }
+            } catch (err) {
+                console.error('Failed to refresh document:', err);
+            }
+            return;
+        }
         try {
             setIsLoading(true);
             setError(null);
@@ -172,6 +205,11 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                 if (!isCurrent()) return;
                 setContent(fullDoc.rawContent || '');
                 setOriginalContent(fullDoc.rawContent || '');
+                latest.current = fullDoc.rawContent || '';
+                sent.current = '';
+                loadedIdentity.current = routeIdentity;
+                setEditorVersion((v) => v + 1);
+                setAutosave('saved');
                 setDocTitle(fullDoc.title || '');
                 setOriginalDocTitle(fullDoc.title || '');
                 setDocPath(getDocumentDirectory(fullDoc.path));
@@ -208,6 +246,63 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
             if (isCurrent()) setIsLoading(false);
         }
     }, [routeIdentity, docs]);
+
+    // ---- visual editor: autosave ----
+
+    const flush = useCallback(async () => {
+        const job = pending.current;
+        if (!job) return;
+        clearTimeout(job.timer);
+        pending.current = null;
+        setAutosave('saving');
+        try {
+            sent.current = job.markdown;
+            await apiClient.updateDoc(job.docId, job.markdown);
+            setOriginalContent(job.markdown);
+            if (!pending.current) setAutosave('saved');
+        } catch (err) {
+            console.error('Failed to save document:', err);
+            setAutosave('failed');
+        }
+    }, []);
+
+    const handleEditorChange = useCallback((markdown: string) => {
+        if (!id) return;
+        latest.current = markdown;
+        setContent(markdown);
+        if (pending.current) clearTimeout(pending.current.timer);
+        pending.current = { docId: addDocPrefix(id), markdown, timer: setTimeout(() => void flush(), AUTOSAVE_MS) };
+        setAutosave('saving');
+    }, [id, flush]);
+
+    // Leaving the document (or the page) saves what is waiting.
+    useEffect(() => () => void flush(), [id, flush]);
+    useEffect(() => {
+        const beforeUnload = () => void flush();
+        window.addEventListener('beforeunload', beforeUnload);
+        return () => window.removeEventListener('beforeunload', beforeUnload);
+    }, [flush]);
+
+    // The title, edited in place: saved on Enter or when leaving it.
+    const saveTitle = useCallback(async (text: string, heading: HTMLElement) => {
+        const normalizedTitle = text.trim();
+        if (!id || normalizedTitle === originalDocTitle) return;
+        if (!normalizedTitle) {
+            heading.textContent = originalDocTitle;
+            return;
+        }
+        await flush();
+        try {
+            await apiClient.updateDoc(addDocPrefix(id), latest.current, normalizedTitle);
+            setDocTitle(normalizedTitle);
+            setOriginalDocTitle(normalizedTitle);
+            await onRefreshData();
+            navigate(`/documentation/${id}/${sanitizeUrlTitle(normalizedTitle)}`, { replace: true });
+        } catch (err) {
+            setSaveError(err instanceof Error ? err : new Error('Failed to rename document'));
+            heading.textContent = originalDocTitle;
+        }
+    }, [id, originalDocTitle, flush, onRefreshData, navigate]);
 
     const handleSave = useCallback(async () => {
         if (!docTitle.trim()) {
@@ -271,6 +366,10 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                 setShowSaveSuccess(true);
                 setTimeout(() => setShowSaveSuccess(false), 4000);
                 // Exit edit mode and navigate to document detail page (this will load in preview mode)
+                latest.current = content;
+                sent.current = content;
+                setOriginalContent(content);
+                setEditorVersion((v) => v + 1);
                 setEditRequested(false);
                 navigate(`/documentation/${id}/${sanitizeUrlTitle(normalizedTitle)}`);
             }
@@ -284,6 +383,7 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
     }, [id, docTitle, docPath, originalDocPath, content, isNewDocument, onRefreshData, navigate, loadDocContent]);
 
     const handleEdit = () => {
+        void flush();
         setEditRequested(true);
     };
 
@@ -359,6 +459,28 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                                             placeholder="guides/setup"
                                         />
                                     </div>
+                                ) : canEdit ? (
+                                    <h1
+                                        key={originalDocTitle}
+                                        contentEditable="plaintext-only"
+                                        suppressContentEditableWarning
+                                        spellCheck={false}
+                                        aria-label="Document title"
+                                        onBlur={(e) => void saveTitle(e.currentTarget.textContent || '', e.currentTarget)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.currentTarget.blur();
+                                            }
+                                            if (e.key === 'Escape') {
+                                                e.currentTarget.textContent = originalDocTitle;
+                                                e.currentTarget.blur();
+                                            }
+                                        }}
+                                        className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2 rounded -mx-1 px-1 outline-none hover:bg-gray-50 dark:hover:bg-gray-800 focus:bg-transparent transition-colors duration-200"
+                                    >
+                                        {originalDocTitle || document?.title || (title ? decodeURIComponent(title) : `Document ${id}`)}
+                                    </h1>
                                 ) : (
                                     <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2 transition-colors duration-200">
                                         {docTitle || document?.title || (title ? decodeURIComponent(title) : `Document ${id}`)}
@@ -403,8 +525,18 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                             </div>
                             <div className="flex items-center space-x-3">
                                 {showEditAction && (
+                                    <span
+                                        className={`inline-flex items-center gap-1.5 text-sm ${autosave === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}
+                                        title={autosave === 'failed' ? 'Edit the text again to retry' : 'Changes are saved as you type'}
+                                    >
+                                        <span style={{ borderRadius: '50%' }} className={`w-2 h-2 ${autosave === 'saved' ? 'bg-green-500' : autosave === 'saving' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
+                                        {autosave === 'saved' ? 'Saved' : autosave === 'saving' ? 'Saving…' : 'Not saved'}
+                                    </span>
+                                )}
+                                {showEditAction && (
                                     <button
                                         onClick={handleEdit}
+                                        title="Edit the Markdown source, the path and the title"
                                         className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors duration-200"
                                     >
                                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor"
@@ -412,7 +544,7 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                         </svg>
-                                        Edit
+                                        Markdown
                                     </button>
                                 )}
                                 {archiveRecord && <ArchiveButton onClick={archive} disabled={isArchiving} />}
@@ -451,11 +583,21 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                 {/* Content Section */}
                 <div className="flex-1 bg-gray-50 dark:bg-gray-800 transition-colors duration-200 flex flex-col">
                     <div className="flex-1 p-8 flex flex-col min-h-0">
-                        <MarkdownEditor
-                            value={content}
-                            onChange={(val) => setContent(val || '')}
-                            isEditing={isEditing}
-                        />
+                        {canEdit && !isEditing && !isNewDocument ? (
+                            <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <DocEditor key={`${routeIdentity}:${editorVersion}`} value={content} onChange={handleEditorChange}>
+                                    <div className="prose prose-sm !max-w-none w-full p-6" data-color-mode={theme}>
+                                        <MermaidMarkdown source={content} />
+                                    </div>
+                                </DocEditor>
+                            </div>
+                        ) : (
+                            <MarkdownEditor
+                                value={content}
+                                onChange={(val) => setContent(val || '')}
+                                isEditing={isEditing}
+                            />
+                        )}
                     </div>
                 </div>
 

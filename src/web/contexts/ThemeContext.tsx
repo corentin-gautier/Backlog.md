@@ -21,38 +21,39 @@ interface ThemeProviderProps {
 	children: React.ReactNode;
 }
 
+// The theme follows the system, live, unless the user picked one with the toggle. That choice is
+// kept under CHOICE_KEY, and dropped when the toggle comes back to the system's theme.
+const CHOICE_KEY = 'backlog-theme-choice';
+const systemQuery = () => window.matchMedia?.('(prefers-color-scheme: dark)');
+const systemTheme = (): Theme => (systemQuery()?.matches ? 'dark' : 'light');
+const savedChoice = (): Theme | null => {
+	const saved = localStorage.getItem(CHOICE_KEY);
+	return saved === 'light' || saved === 'dark' ? saved : null;
+};
+
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-	const [theme, setTheme] = useState<Theme>(() => {
-		// Check localStorage for saved theme preference
-		const savedTheme = localStorage.getItem('backlog-theme') as Theme;
-		if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
-			return savedTheme;
-		}
-		
-		// Check system preference
-		if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-			return 'dark';
-		}
-		
-		return 'light';
-	});
+	const [choice, setChoice] = useState<Theme | null>(savedChoice);
+	const [system, setSystem] = useState<Theme>(systemTheme);
+	const theme = choice ?? system;
 
 	useEffect(() => {
-		// Apply theme to document root
-		const root = document.documentElement;
-		
-		if (theme === 'dark') {
-			root.classList.add('dark');
-		} else {
-			root.classList.remove('dark');
-		}
-		
-		// Save to localStorage
-		localStorage.setItem('backlog-theme', theme);
+		const query = systemQuery();
+		if (!query) return;
+		const onChange = () => setSystem(query.matches ? 'dark' : 'light');
+		query.addEventListener('change', onChange);
+		return () => query.removeEventListener('change', onChange);
+	}, []);
+
+	useEffect(() => {
+		document.documentElement.classList.toggle('dark', theme === 'dark');
 	}, [theme]);
 
 	const toggleTheme = () => {
-		setTheme(prev => prev === 'light' ? 'dark' : 'light');
+		const next: Theme = theme === 'light' ? 'dark' : 'light';
+		const picked = next === system ? null : next;
+		if (picked) localStorage.setItem(CHOICE_KEY, picked);
+		else localStorage.removeItem(CHOICE_KEY);
+		setChoice(picked);
 	};
 
 	return (

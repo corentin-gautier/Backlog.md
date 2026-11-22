@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import '@uiw/react-md-editor/markdown-editor.css';
 @import '@uiw/react-markdown-preview/markdown.css';
+@import '@milkdown/crepe/theme/common/style.css';
 
 @source not inline("{rounded-full}");
 
@@ -266,3 +267,66 @@
         resize: none !important;
     }
 }
+
+/* Visual document editor (DocEditor, Milkdown Crepe), in Tailwind's gray palette. */
+.doc-editor .milkdown {
+    --crepe-color-background: #ffffff;
+    --crepe-color-on-background: #111827;
+    --crepe-color-surface: #f9fafb;
+    --crepe-color-surface-low: #f3f4f6;
+    --crepe-color-on-surface: #1f2937;
+    --crepe-color-on-surface-variant: #4b5563;
+    --crepe-color-outline: #9ca3af;
+    --crepe-color-primary: #2563eb;
+    --crepe-color-secondary: #dbeafe;
+    --crepe-color-on-secondary: #1e3a8a;
+    --crepe-color-inverse: #f3f4f6;
+    --crepe-color-on-inverse: #111827;
+    --crepe-color-inline-code: #be123c;
+    --crepe-color-error: #dc2626;
+    --crepe-color-hover: #f3f4f6;
+    --crepe-color-selected: #bfdbfe;
+    --crepe-color-inline-area: #e5e7eb;
+    --crepe-base-font-size: 15px;
+    --crepe-font-title: inherit;
+    --crepe-font-default: inherit;
+    --crepe-font-code: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --crepe-shadow-1: 0 1px 3px rgb(0 0 0 / 0.12), 0 1px 2px rgb(0 0 0 / 0.08);
+    --crepe-shadow-2: 0 6px 20px rgb(0 0 0 / 0.15), 0 1px 3px rgb(0 0 0 / 0.1);
+    background: transparent;
+    border-radius: 0.5rem;
+}
+.dark .doc-editor .milkdown {
+    --crepe-color-background: #1f2937;
+    --crepe-color-on-background: #f3f4f6;
+    --crepe-color-surface: #111827;
+    --crepe-color-surface-low: #374151;
+    --crepe-color-on-surface: #e5e7eb;
+    --crepe-color-on-surface-variant: #9ca3af;
+    --crepe-color-outline: #6b7280;
+    --crepe-color-primary: #60a5fa;
+    --crepe-color-secondary: #1e3a8a;
+    --crepe-color-on-secondary: #dbeafe;
+    --crepe-color-inverse: #374151;
+    --crepe-color-on-inverse: #f3f4f6;
+    --crepe-color-inline-code: #fb7185;
+    --crepe-color-error: #f87171;
+    --crepe-color-hover: #374151;
+    --crepe-color-selected: #1e40af;
+    --crepe-color-inline-area: #374151;
+    --crepe-shadow-1: 0 1px 3px rgb(0 0 0 / 0.5);
+    --crepe-shadow-2: 0 6px 20px rgb(0 0 0 / 0.5);
+}
+.doc-editor .milkdown .ProseMirror {
+    padding: 24px 32px 32px 64px;
+}
+.doc-editor .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+    font-weight: 600;
+    line-height: 1.3;
+    margin-top: 1.4em;
+}
+.doc-editor .milkdown .ProseMirror h1 { font-size: 1.75em; }
+.doc-editor .milkdown .ProseMirror h2 { font-size: 1.4em; }
+.doc-editor .milkdown .ProseMirror h3 { font-size: 1.2em; }
+.doc-editor .milkdown .ProseMirror :is(h4, h5, h6) { font-size: 1em; }
+.doc-editor .milkdown .ProseMirror > :first-child { margin-top: 0; }
