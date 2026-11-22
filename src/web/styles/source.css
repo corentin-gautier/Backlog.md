@@ -332,5 +332,5 @@
 .doc-editor .milkdown .ProseMirror h2 { font-size: 1.4em; }
 .doc-editor .milkdown .ProseMirror h3 { font-size: 1.2em; }
 .doc-editor .milkdown .ProseMirror :is(h4, h5, h6) { font-size: 1em; }
-/* The first block, past Milkdown's hidden widgets (the placeholder's, say). */
-.doc-editor .milkdown .ProseMirror > :nth-child(1 of :not(.ProseMirror-widget)) { margin-top: 0; }
+/* The first block, past what Milkdown puts before it: hidden widgets, and the caret while editing. */
+.doc-editor .milkdown .ProseMirror > :nth-child(1 of :not(.ProseMirror-widget, .prosemirror-virtual-cursor)) { margin-top: 0; }
