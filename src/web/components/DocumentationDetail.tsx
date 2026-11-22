@@ -535,9 +535,6 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                                 </div>
                             </div>
                             <div className="flex items-center space-x-3">
-                                {!isEditing && !isNewDocument && (
-                                    <VaultButton state={vaultState} docId={currentDocument?.id} beforeLock={flush} />
-                                )}
                                 {showEditAction && (
                                     <span
                                         className={`inline-flex items-center gap-1.5 text-sm ${autosave === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}
@@ -546,6 +543,9 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                                         <span style={{ borderRadius: '50%' }} className={`w-2 h-2 ${autosave === 'saved' ? 'bg-green-500' : autosave === 'saving' ? 'bg-amber-500 animate-pulse' : 'bg-red-500'}`} />
                                         {autosave === 'saved' ? 'Saved' : autosave === 'saving' ? 'Saving…' : 'Not saved'}
                                     </span>
+                                )}
+                                {!isEditing && !isNewDocument && (
+                                    <VaultButton state={vaultState} docId={currentDocument?.id} beforeLock={flush} />
                                 )}
                                 {showEditAction && (
                                     <button
