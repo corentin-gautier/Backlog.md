@@ -317,8 +317,11 @@
     --crepe-shadow-1: 0 1px 3px rgb(0 0 0 / 0.5);
     --crepe-shadow-2: 0 6px 20px rgb(0 0 0 / 0.5);
 }
+/* No block handle: "/" inserts blocks, and dragging lines is not needed. */
+.doc-editor .milkdown .milkdown-block-handle { display: none; }
+
 .doc-editor .milkdown .ProseMirror {
-    padding: 24px 32px 32px 64px;
+    padding: 24px 32px 32px;
 }
 .doc-editor .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
     font-weight: 600;
