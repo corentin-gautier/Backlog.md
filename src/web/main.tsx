@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { HealthCheckProvider } from './contexts/HealthCheckContext';
 import { browserSnapshot } from './lib/browser-snapshot';
+import './lib/hub-links';
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
