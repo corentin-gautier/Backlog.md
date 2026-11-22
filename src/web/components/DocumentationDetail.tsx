@@ -538,9 +538,9 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                     }
                     meta={[
                         isArchived && <ArchivedLabel />,
-                        // The file name starts with the id ("doc-6 - Title.md"): no need to show it twice.
-                        !document?.path?.split('/').pop()?.toLowerCase().startsWith(`${(document?.id || `doc-${id}`).toLowerCase()} `) && <RecordId id={document?.id || `doc-${id}`} />,
-                        document?.path && <span>{document.path}</span>,
+                        <RecordId id={document?.id || `doc-${id}`} />,
+                        // The path without the id that starts the file name ("doc-6 - Title.md"): the chip shows it.
+                        document?.path && <span>{document.path.replace(/(^|\/)doc-[\w.-]+ - /i, '$1')}</span>,
                         document?.createdDate && <span>Created <StoredDate value={document.createdDate} dateFormat={dateFormat} /></span>,
                     ]}
                 >
