@@ -14,6 +14,7 @@ import { sanitizeUrlTitle } from '../utils/urlHelpers';
 import StoredDate from './StoredDate';
 import { decisionIdKey } from '../../utils/decision-id';
 import { ArchiveButton, ArchivedLabel, ArchiveRefusal, useRecordArchive } from './RecordArchive';
+import { primaryButton, quietButton, RecordHeader, RecordId, titleClass } from './RecordHeader';
 
 // Utility function for ID transformations
 const stripIdPrefix = (id: string): string => {
@@ -303,92 +304,53 @@ export default function DecisionDetail({ decisions, onRefreshData, dateFormat }:
 	return (
 		<ErrorBoundary>
 			<div className="h-full bg-white dark:bg-gray-900 flex flex-col transition-colors duration-200">
-			{/* Header Section - Confluence/Linear Style */}
-			<div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200">
-				<div className="max-w-4xl mx-auto px-8 py-6">
-					{/* The header and its metadata row wrap, so on a narrow window the buttons stay on the page. */}
-					<div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 mb-6">
-						<div className="flex-1">
-							{isEditing ? (
-								<input
-									type="text"
-									value={decisionTitle}
-									onChange={(e) => setDecisionTitle(e.target.value)}
-									className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2 w-full bg-transparent border border-gray-300 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-colors duration-200"
-									placeholder="Decision title"
-								/>
-							) : (
-								<h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2 transition-colors duration-200">
-									{decisionTitle || decision?.title || (title ? decodeURIComponent(title) : `Decision ${id}`)}
-								</h1>
-							)}
-							<div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500 dark:text-gray-400 transition-colors duration-200">
-								{isArchived && <ArchivedLabel />}
-								<div className="flex items-center space-x-2">
-									<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a.997.997 0 01-1.414 0l-7-7A1.997 1.997 0 013 12V7a4 4 0 014-4z" />
-									</svg>
-									<span>ID: {decision?.id}</span>
-								</div>
-								<div className="flex items-center space-x-2">
-									<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-									</svg>
-									<span>Decision</span>
-								</div>
-								{decision?.date && (
-									<div className="flex items-center space-x-2">
-										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-										</svg>
-										<span>Date: <StoredDate value={decision.date} dateFormat={dateFormat} /></span>
-									</div>
-								)}
-								{decision?.status && (
-									<div className="flex items-center space-x-2">
-										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-										</svg>
-										<span 
-											className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(decision.status)}`}
-										>
-											{decision.status.charAt(0).toUpperCase() + decision.status.slice(1)}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-						<div className="flex items-center space-x-3">
+			<RecordHeader
+				title={
+					isEditing ? (
+						<input
+							type="text"
+							value={decisionTitle}
+							onChange={(e) => setDecisionTitle(e.target.value)}
+							className={`${titleClass} w-full bg-transparent border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent`}
+							placeholder="Decision title"
+						/>
+					) : (
+						<h1 className={titleClass}>
+							{decisionTitle || decision?.title || (title ? decodeURIComponent(title) : `Decision ${id}`)}
+						</h1>
+					)
+				}
+				actions={
+					(archiveRecord || isEditing) && (
+						<>
 							{archiveRecord && <ArchiveButton onClick={archive} disabled={isArchiving} />}
 							{isEditing && (
-								<div className="flex items-center space-x-2">
-										<button
-											onClick={handleCancelEdit}
-											className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors duration-200"
-										>
-											Cancel
-										</button>
-									<button
-										onClick={handleSave}
-										disabled={!hasChanges || isSaving}
-											className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors duration-200 ${
-												hasChanges && !isSaving
-													? 'bg-blue-600 dark:bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-700 focus:ring-blue-500 dark:focus:ring-blue-400'
-													: 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-											}`}
-										>
-											<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-											</svg>
+								<>
+									<button onClick={handleCancelEdit} className={quietButton}>Cancel</button>
+									<button onClick={handleSave} disabled={!hasChanges || isSaving} className={primaryButton}>
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+										</svg>
 										{isSaving ? 'Saving...' : 'Save'}
 									</button>
-								</div>
+								</>
 							)}
-						</div>
-					</div>
-				</div>
+						</>
+					)
+				}
+				meta={[
+					isArchived && <ArchivedLabel />,
+					decision?.id && <RecordId id={decision.id} />,
+					decision?.status && (
+						<span className={`inline-flex items-center px-1.5 py-px rounded text-xs font-medium border ${getStatusColor(decision.status)}`}>
+							{decision.status.charAt(0).toUpperCase() + decision.status.slice(1)}
+						</span>
+					),
+					decision?.date && <StoredDate value={decision.date} dateFormat={dateFormat} />,
+				]}
+			>
 				{archiveError && <ArchiveRefusal message={archiveError} onDismiss={dismissArchiveError} />}
-			</div>
+			</RecordHeader>
 
 			{/* Content Section */}
 			<div className="flex-1 bg-gray-50 dark:bg-gray-800 transition-colors duration-200 flex flex-col">

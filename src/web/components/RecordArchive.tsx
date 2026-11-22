@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, readMovedFailureState } from '../lib/api';
+import { quietDangerButton } from './RecordHeader';
 
 /**
  * The Archive button of the document page and the decision page, and what it does. It extends the
@@ -107,7 +108,7 @@ export function useRecordArchive(
 	};
 }
 
-/** The header button. It looks like the other header buttons, in the red of the task Archive button. */
+/** The header button: quiet like the other header buttons, red on hover. */
 export function ArchiveButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
 	return (
 		<button
@@ -115,9 +116,9 @@ export function ArchiveButton({ onClick, disabled }: { onClick: () => void; disa
 			onClick={onClick}
 			disabled={disabled}
 			aria-busy={disabled}
-			className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-400 dark:focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors duration-200"
+			className={quietDangerButton}
 		>
-			<svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+			<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 				<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
 			</svg>
 			Archive
