@@ -538,7 +538,8 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                     }
                     meta={[
                         isArchived && <ArchivedLabel />,
-                        <RecordId id={document?.id || `doc-${id}`} />,
+                        // The file name starts with the id ("doc-6 - Title.md"): no need to show it twice.
+                        !document?.path?.split('/').pop()?.toLowerCase().startsWith(`${(document?.id || `doc-${id}`).toLowerCase()} `) && <RecordId id={document?.id || `doc-${id}`} />,
                         document?.path && <span>{document.path}</span>,
                         document?.createdDate && <span>Created <StoredDate value={document.createdDate} dateFormat={dateFormat} /></span>,
                     ]}
