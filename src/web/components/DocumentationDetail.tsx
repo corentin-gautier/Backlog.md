@@ -15,7 +15,7 @@ import StoredDate from './StoredDate';
 import { documentIdKey } from '../../utils/document-id';
 import { ArchiveButton, ArchivedLabel, ArchiveRefusal, useRecordArchive } from './RecordArchive';
 import { ButtonDivider, primaryButton, quietButton, RecordHeader, RecordId, titleClass } from './RecordHeader';
-import { useVault, VAULT_MARKER } from '../lib/hub-vault';
+import { isVaultLocked, useVault } from '../lib/hub-vault';
 import { LockedDoc, VaultButton } from './VaultControls';
 
 // Custom MDEditor wrapper for proper height handling
@@ -117,7 +117,7 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
     const isArchived = currentDocument?.archived === true;
     // Encrypted on disk (Backlog Hub): read-only until unlocked, so the encrypted file is never overwritten.
     const vaultState = useVault();
-    const lockedOnDisk = !isNewDocument && content.includes(VAULT_MARKER);
+    const lockedOnDisk = !isNewDocument && isVaultLocked(content);
     const canEdit = canWrite && !isArchived && !lockedOnDisk;
     const isEditing = canEdit && editRequested;
     const showEditAction = canEdit && !isEditing;
@@ -174,7 +174,7 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                 if (!isCurrent()) return;
                 setDocument(fullDoc);
                 const raw = fullDoc.rawContent || '';
-                if (raw.includes(VAULT_MARKER) && pending.current) {
+                if (isVaultLocked(raw) && pending.current) {
                     // Encrypted meanwhile (Backlog Hub locked it): the waiting edit must not write it back in clear.
                     clearTimeout(pending.current.timer);
                     pending.current = null;

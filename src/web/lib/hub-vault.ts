@@ -7,8 +7,9 @@ export type VaultDoc = { id: string; marked: boolean; locked: boolean };
 export type VaultState = { docs: VaultDoc[]; until: number | null; error?: string };
 export type VaultAction = "status" | "mark" | "unmark" | "unlock" | "lock";
 
-// The text an encrypted doc holds on disk in place of its body.
-export const VAULT_MARKER = "<!-- backlogs-vault v1 ";
+// Whether a doc's text is encrypted: the marker alone on its line with its base64 payload, in place
+// of the body. A doc that only quotes the marker (the format's own doc) is not encrypted.
+export const isVaultLocked = (text: string) => /^<!-- backlogs-vault v1 [A-Za-z0-9+/]{40,}={0,2} -->$/m.test(text);
 
 const embedded = typeof window !== "undefined" && window.parent !== window;
 let state: VaultState | null = null;
