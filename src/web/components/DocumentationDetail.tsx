@@ -14,6 +14,8 @@ import { sanitizeUrlTitle } from '../utils/urlHelpers';
 import StoredDate from './StoredDate';
 import { documentIdKey } from '../../utils/document-id';
 import { ArchiveButton, ArchivedLabel, ArchiveRefusal, useRecordArchive } from './RecordArchive';
+import { useVault, VAULT_MARKER } from '../lib/hub-vault';
+import { LockedDoc, VaultButton } from './VaultControls';
 
 // Custom MDEditor wrapper for proper height handling
 const MarkdownEditor = memo(function MarkdownEditor({
@@ -112,7 +114,10 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
     const routeIdentity = id && !isNewDocument ? documentIdKey(id) : null;
     const currentDocument = document && routeIdentity && documentIdKey(document.id) === routeIdentity ? document : null;
     const isArchived = currentDocument?.archived === true;
-    const canEdit = canWrite && !isArchived;
+    // Encrypted on disk (Backlog Hub): read-only until unlocked, so the encrypted file is never overwritten.
+    const vaultState = useVault();
+    const lockedOnDisk = !isNewDocument && content.includes(VAULT_MARKER);
+    const canEdit = canWrite && !isArchived && !lockedOnDisk;
     const isEditing = canEdit && editRequested;
     const showEditAction = canEdit && !isEditing;
     const archiveRecord = showEditAction && !isLoading ? currentDocument : null;
@@ -168,6 +173,12 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                 if (!isCurrent()) return;
                 setDocument(fullDoc);
                 const raw = fullDoc.rawContent || '';
+                if (raw.includes(VAULT_MARKER) && pending.current) {
+                    // Encrypted meanwhile (Backlog Hub locked it): the waiting edit must not write it back in clear.
+                    clearTimeout(pending.current.timer);
+                    pending.current = null;
+                    setAutosave('saved');
+                }
                 const ours = [latest.current, sent.current].some((m) => m.trimEnd() === raw.trimEnd());
                 if (!ours && !pending.current) {
                     // Changed elsewhere (another window, an agent, git): show it.
@@ -524,6 +535,9 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                                 </div>
                             </div>
                             <div className="flex items-center space-x-3">
+                                {!isEditing && !isNewDocument && (
+                                    <VaultButton state={vaultState} docId={currentDocument?.id} beforeLock={flush} />
+                                )}
                                 {showEditAction && (
                                     <span
                                         className={`inline-flex items-center gap-1.5 text-sm ${autosave === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}
@@ -583,7 +597,9 @@ export default function DocumentationDetail({docs, onRefreshData, dateFormat}: D
                 {/* Content Section */}
                 <div className="flex-1 bg-gray-50 dark:bg-gray-800 transition-colors duration-200 flex flex-col">
                     <div className="flex-1 p-8 flex flex-col min-h-0">
-                        {canEdit && !isEditing && !isNewDocument ? (
+                        {lockedOnDisk ? (
+                            <LockedDoc state={vaultState} docId={currentDocument?.id} />
+                        ) : canEdit && !isEditing && !isNewDocument ? (
                             <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                                 <DocEditor key={`${routeIdentity}:${editorVersion}`} value={content} onChange={handleEditorChange}>
                                     <div className="prose prose-sm !max-w-none w-full p-6" data-color-mode={theme}>

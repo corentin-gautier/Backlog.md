@@ -17,6 +17,8 @@ import { getWebVersion } from '../utils/version';
 import { apiClient } from '../lib/api';
 import { parseSearchCommandQuery } from '../utils/search-command-query';
 import { buildDocsTree, type DocsTreeNode } from '../lib/docs-tree';
+import { useVault, vaultDoc } from '../lib/hub-vault';
+import { Padlock } from './VaultControls';
 
 // Utility functions for ID transformations
 const stripIdPrefix = (id: string): string => {
@@ -193,7 +195,10 @@ const Icons = {
 };
 
 // Shared render path for sidebar document links (search results, folder tree, and flat list).
-const DocLink = ({ doc, depth = 0 }: { doc: Document; depth?: number }) => (
+// A padlock marks a doc Backlog Hub keeps encrypted (open while unlocked).
+const DocLink = ({ doc, depth = 0 }: { doc: Document; depth?: number }) => {
+	const encrypted = vaultDoc(useVault(), doc.id);
+	return (
 	<NavLink
 		to={`/documentation/${stripIdPrefix(doc.id)}/${sanitizeUrlTitle(doc.title)}`}
 		className={({ isActive }) =>
@@ -207,8 +212,14 @@ const DocLink = ({ doc, depth = 0 }: { doc: Document; depth?: number }) => (
 	>
 		<span className="text-gray-400 dark:text-gray-500"><Icons.DocumentPage /></span>
 		<span className="truncate">{doc.title}</span>
+		{encrypted?.marked && (
+			<span className="ml-auto flex-none text-gray-400 dark:text-gray-500" title={encrypted.locked ? "Encrypted" : "Encrypted, unlocked"}>
+				<Padlock open={!encrypted.locked} className="w-3.5 h-3.5" />
+			</span>
+		)}
 	</NavLink>
-);
+	);
+};
 
 interface FolderNodeProps {
 	node: DocsTreeNode;
